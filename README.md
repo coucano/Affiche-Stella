@@ -15,7 +15,7 @@ Automatique chaque nuit. Pour lancer tout de suite : onglet **Actions** → « G
 
 Deux possibilités :
 
-1. Dans le Google Sheet, ajouter une colonne nommée **Affiche** et y coller le lien de la bonne image sur la ligne du film.
+1. Dans le Google Sheet, ajouter une colonne nommée **Affiche** et y coller, sur la ligne du film, le lien de sa fiche Allociné (`https://www.allocine.fr/film/fichefilm_gen_cfilm=…html`) ou le lien direct d'une image.
 2. Ou modifier `data/overrides.json` ici :
 
 ```json

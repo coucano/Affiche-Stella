@@ -299,6 +299,16 @@ async function main() {
   }
   await Promise.all(Array.from({ length: 4 }, worker));
   // Allociné : une seule fois par film trouvé, à la suite (pas en parallèle)
+  // colonne « Affiche » avec un lien de fiche Allociné : on récupère l'affiche de cette fiche (une fois)
+  for (const f of films) {
+    const id = (f.manual.match(/allocine\.fr\/film\/fichefilm(?:_gen_cfilm=|-)(\d+)/) || [])[1];
+    if (!id) continue;
+    const k = keyOf(f); cache[k] = cache[k] || { found: false, t: Date.now() };
+    if (cache[k].manualAlloId !== id) {
+      try { cache[k].manualAlloImg = await allocinePoster(id); cache[k].manualAlloId = id; }
+      catch (e) { console.warn(`! Allociné (${f.title}) : ${e.message}`); }
+    }
+  }
   const keys = new Set(films.map(keyOf));
   const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && c.alloV !== 2);
   console.log(`${alloTodo.length} films à vérifier sur Allociné`);
@@ -310,7 +320,8 @@ async function main() {
   // données publiées : rien de secret, uniquement ce que la page affiche
   const out = films.map(f => {
     const k = keyOf(f), c = cache[k] || {};
-    const manual = f.manual || overrides[k] || overrides[f.title] || "";
+    const isFiche = /allocine\.fr\/film\//.test(f.manual);
+    const manual = (isFiche ? c.manualAlloImg : f.manual) || overrides[k] || overrides[f.title] || "";
     return {
       title: f.title, real: f.real, small: f.small, big: f.big, other: f.other, store: f.store, total: f.total, year: f.year,
       img: manual || c.alloPoster || (c.poster ? "https://image.tmdb.org/t/p/w500" + c.poster : ""),
