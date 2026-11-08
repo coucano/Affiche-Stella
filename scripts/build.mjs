@@ -11,6 +11,8 @@ const GID = process.env.SHEET_GID || "0";
 const TMDB_KEY = process.env.TMDB_KEY;
 const CACHE_FILE = path.join(ROOT, "data/posters.json");
 const OVERRIDES_FILE = path.join(ROOT, "data/overrides.json");
+const SEEN_FILE = path.join(ROOT, "data/first-seen.json");   // date d'apparition de chaque film dans le tableau
+const NEW_DAYS = 7;                                          // badge « Nouveau » pendant 7 jours
 const MISS_RETRY_DAYS = 3;     // un film sans affiche est recherché à nouveau après 3 jours
 const REFRESH_DAYS = 14;       // popularité / note rafraîchies toutes les 2 semaines
 
@@ -336,6 +338,19 @@ async function main() {
   await mkdir(path.dirname(CACHE_FILE), { recursive: true });
   await writeFile(CACHE_FILE, JSON.stringify(cache, null, 1) + "\n");
 
+  // nouveautés : on note la date à laquelle chaque film apparaît pour la première fois dans le tableau
+  let seen = await readJSON(SEEN_FILE, null);
+  const firstRun = seen === null; seen = seen || {};
+  const today = new Date().toISOString().slice(0, 10);
+  const newOnes = [];
+  for (const f of films) {
+    const k = keyOf(f);
+    if (!seen[k]) { seen[k] = firstRun ? "initial" : today; if (!firstRun) newOnes.push(f.title); }
+  }
+  await writeFile(SEEN_FILE, JSON.stringify(seen, null, 1) + "\n");
+  if (newOnes.length) console.log(`Nouveaux films : ${newOnes.join(", ")}`);
+  await writeFile(path.join(ROOT, "data/new-films.txt"), newOnes.join("\n") + (newOnes.length ? "\n" : ""));
+
   // données publiées : rien de secret, uniquement ce que la page affiche
   const out = films.map(f => {
     const k = keyOf(f), c = cache[k] || {};
@@ -346,6 +361,7 @@ async function main() {
       img: manual || c.alloPoster || (c.poster ? "https://image.tmdb.org/t/p/w500" + c.poster : ""),
       src: manual ? "manuel" : c.alloPoster ? "allocine" : c.found ? (c.fr ? "fr" : "vo") : "",
       allocine: c.allocine || null,
+      added: seen[k] && seen[k] !== "initial" ? seen[k] : null,
       tmdb: c.tmdb || null, pop: c.pop || 0, note: c.note || 0, votes: c.votes || 0,
     };
   });
