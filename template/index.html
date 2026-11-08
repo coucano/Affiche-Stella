@@ -91,7 +91,7 @@ const $ = s => document.querySelector(s);
 const films = (DATA && DATA.films) || [];
 function normalize(s){ return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim(); }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-const SRC = {fr:"affiche FR", vo:"affiche VO", manuel:"affiche choisie"};
+const SRC = {allocine:"affiche Allociné", fr:"affiche FR (TMDB)", vo:"affiche VO (TMDB)", manuel:"affiche choisie"};
 
 function card(f){
   const chips=[];
@@ -99,7 +99,7 @@ function card(f){
   if(f.big) chips.push(`<span class="chip">Grande <b>${esc(f.big)}</b></span>`);
   if(f.other) chips.push(`<span class="chip">${esc(f.other)}</span>`);
   if(f.store) chips.push(`<span class="chip store" title="Stockage">${esc(f.store)}</span>`);
-  const allo="https://www.allocine.fr/rechercher/?q="+encodeURIComponent(f.title.replace(/\(.*?\)/g,"").trim());
+  const allo=f.allocine ? `https://www.allocine.fr/film/fichefilm_gen_cfilm=${f.allocine}.html` : "https://www.allocine.fr/rechercher/?q="+encodeURIComponent(f.title.replace(/\(.*?\)/g,"").trim());
   const rating = f.votes>=5 ? `<span class="rating">★ ${f.note.toFixed(1).replace(".",",")} <small>/10 · ${f.votes} votes</small></span>` : "";
   const src = f.src ? ` · ${f.tmdb?`<a href="https://www.themoviedb.org/movie/${f.tmdb}" target="_blank" rel="noopener">${SRC[f.src]}</a>`:SRC[f.src]}` : "";
   return `<article class="card">

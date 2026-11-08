@@ -203,6 +203,61 @@ async function lookup(f) {
   };
 }
 
+/* ---------------- Allociné ----------------
+   On ne passe PAS par la recherche d'Allociné (interdite aux robots par leur robots.txt).
+   Le film est identifié via TMDB, son identifiant Allociné est lu dans Wikidata (propriété P1265),
+   puis seule la fiche du film est consultée, lentement, une seule fois par film. */
+const UA = "AffichesStella/1.0 (inventaire personnel d'affiches; une requete par film)";
+let alloRobots = null;
+async function allocineAllowed(pathname) {
+  if (alloRobots === null) {
+    try {
+      const r = await fetch("https://www.allocine.fr/robots.txt", { headers: { "User-Agent": UA } });
+      const txt = r.ok ? await r.text() : "";
+      const rules = []; let inStar = false;   // règles du groupe « User-agent: * »
+      for (const line of txt.split(/\r?\n/)) {
+        const [k, ...v] = line.split(":"); const key = k.trim().toLowerCase(), val = v.join(":").trim();
+        if (key === "user-agent") inStar = val === "*";
+        else if (inStar && (key === "disallow" || key === "allow") && val) rules.push({ allow: key === "allow", path: val });
+      }
+      alloRobots = rules;
+    } catch { alloRobots = [{ allow: false, path: "/" }]; }
+  }
+  const match = alloRobots.filter(r => pathname.startsWith(r.path.replace(/\*.*$/, "")))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+  return !match || match.allow;
+}
+async function allocineId(tmdbId) {
+  const ext = await tmdb(`/movie/${tmdbId}/external_ids`);
+  if (!ext.wikidata_id) return null;
+  const r = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${ext.wikidata_id}.json`, { headers: { "User-Agent": UA } });
+  if (!r.ok) return null;
+  const e = (await r.json()).entities?.[ext.wikidata_id];
+  return e?.claims?.P1265?.[0]?.mainsnak?.datavalue?.value || null;
+}
+let lastAllo = 0;
+async function allocinePoster(id) {
+  const pathname = `/film/fichefilm_gen_cfilm=${id}.html`;
+  if (!(await allocineAllowed(pathname))) return null;
+  const wait = lastAllo + 3000 - Date.now(); if (wait > 0) await sleep(wait);   // 1 page toutes les 3 s au plus
+  lastAllo = Date.now();
+  const r = await fetch("https://www.allocine.fr" + pathname, { headers: { "User-Agent": UA, "Accept-Language": "fr-FR" } });
+  if (!r.ok) throw new Error(`Allociné ${r.status}`);
+  const html = await r.text();
+  const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (!m || !/acsta\.net\/.*pictures\//.test(m[1]) || /empty|default|placeholder/i.test(m[1])) return null;
+  return m[1].replace(/(acsta\.net)\/(?:[a-z]_[^/]+\/)?pictures\//, "$1/c_310_420/pictures/");
+}
+async function addAllocine(c) {
+  try {
+    const id = await allocineId(c.tmdb);
+    c.allocine = id || null;
+    if (id) c.alloPoster = await allocinePoster(id);
+    c.alloChecked = Date.now();
+  } catch (e) { console.warn(`! Allociné (${c.tmdbTitle}) : ${e.message}`); }
+}
+
 /* ---------------- Programme principal ---------------- */
 async function readJSON(file, def) { try { return JSON.parse(await readFile(file, "utf8")); } catch { return def; } }
 
@@ -226,12 +281,22 @@ async function main() {
   async function worker() {
     while (i < todo.length) {
       const f = todo[i++];
-      try { cache[keyOf(f)] = await lookup(f); }
+      try {
+        const k = keyOf(f), old = cache[k], fresh = await lookup(f);
+        // même film qu'avant : on garde l'affiche Allociné déjà trouvée (pas de nouvelle visite)
+        if (old && old.alloChecked && old.tmdb === fresh.tmdb) Object.assign(fresh, { allocine: old.allocine, alloPoster: old.alloPoster, alloChecked: old.alloChecked });
+        cache[k] = fresh;
+      }
       catch (e) { console.warn(`! ${f.title} : ${e.message}`); }
       if (++done % 25 === 0) console.log(`  ${done}/${todo.length}`);
     }
   }
   await Promise.all(Array.from({ length: 4 }, worker));
+  // Allociné : une seule fois par film trouvé, à la suite (pas en parallèle)
+  const keys = new Set(films.map(keyOf));
+  const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && !c.alloChecked);
+  console.log(`${alloTodo.length} films à vérifier sur Allociné`);
+  for (const [, c] of alloTodo) await addAllocine(c);
   await mkdir(path.dirname(CACHE_FILE), { recursive: true });
   await writeFile(CACHE_FILE, JSON.stringify(cache, null, 1) + "\n");
 
@@ -241,12 +306,13 @@ async function main() {
     const manual = f.manual || overrides[k] || overrides[f.title] || "";
     return {
       title: f.title, real: f.real, small: f.small, big: f.big, other: f.other, store: f.store, total: f.total, year: f.year,
-      img: manual || (c.poster ? "https://image.tmdb.org/t/p/w500" + c.poster : ""),
-      src: manual ? "manuel" : c.found ? (c.fr ? "fr" : "vo") : "",
+      img: manual || c.alloPoster || (c.poster ? "https://image.tmdb.org/t/p/w500" + c.poster : ""),
+      src: manual ? "manuel" : c.alloPoster ? "allocine" : c.found ? (c.fr ? "fr" : "vo") : "",
+      allocine: c.allocine || null,
       tmdb: c.tmdb || null, pop: c.pop || 0, note: c.note || 0, votes: c.votes || 0,
     };
   });
-  const found = out.filter(x => x.img).length, fr = out.filter(x => x.src === "fr" || x.src === "manuel").length;
+  const found = out.filter(x => x.img).length, fr = out.filter(x => x.img && x.src !== "vo").length;
   console.log(`Affiches : ${found}/${out.length} trouvées, dont ${fr} françaises ou choisies à la main`);
 
   const tpl = await readFile(path.join(ROOT, "template/index.html"), "utf8");

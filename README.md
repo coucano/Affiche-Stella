@@ -3,7 +3,8 @@
 Page qui montre les affiches de cinéma disponibles, avec l'affiche de chaque film.
 
 - La liste vient du Google Sheet du cinéma (lu chaque nuit).
-- Les affiches, la popularité et les notes viennent de [TMDB](https://www.themoviedb.org), en version française quand elle existe.
+- Chaque film est identifié sur [TMDB](https://www.themoviedb.org) (titre, année, réalisateur), qui fournit aussi la popularité et les notes.
+- L'affiche vient d'Allociné quand le film y est relié (identifiant Allociné lu dans Wikidata, une seule visite par film, jamais la recherche d'Allociné), sinon de TMDB en version française si elle existe.
 - La page est publiée avec GitHub Pages.
 
 ## Mise à jour
