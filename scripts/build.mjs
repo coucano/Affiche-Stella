@@ -179,6 +179,10 @@ async function findMovie(f) {
       }
       const exact = cands.find(c => c.dy === 0);
       if (exact) return exact.m;
+      // réalisateur différent dans le tableau (erreur de saisie ?) : on accepte un titre identique
+      // à un an près, s'il n'y a qu'un seul candidat de ce genre
+      const sameTitle = cands.filter(c => c.sim >= 0.99 && c.dy !== null && c.dy <= 1);
+      if (sameTitle.length === 1) { dbg("titre identique accepté malgré le réalisateur"); return sameTitle[0].m; }
       if (anyKnown) continue;
     }
     const ok = cands.find(c => acceptByYear(c, f));
