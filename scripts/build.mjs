@@ -252,16 +252,16 @@ async function allocinePoster(id) {
   const html = await r.text();
   const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-  // affiches récentes : …/pictures/…, anciennes : …/medias/nmedia/…
-  if (!m || !/acsta\.net\/.*(pictures|medias)\//.test(m[1]) || /empty|default|placeholder/i.test(m[1])) return null;
-  return m[1].replace(/(acsta\.net)\/(?:[a-z]_[^/]+\/)?(pictures|medias)\//, "$1/c_310_420/$2/");
+  // images hébergées sur acsta.net : …/pictures/…, …/medias/nmedia/… ou …/img/xx/yy/…
+  if (!m || !/^https?:\/\/[^/]*acsta\.net\//.test(m[1]) || /common|empty|default|placeholder|logo/i.test(m[1])) return null;
+  return m[1].replace(/^(https?:\/\/[^/]*acsta\.net)\/(?:[a-z]_\d+_\d+\/)?/, "$1/c_310_420/");
 }
 async function addAllocine(c) {
   try {
     const id = await allocineId(c.tmdb);
     c.allocine = id || null;
     if (id) c.alloPoster = await allocinePoster(id);
-    c.alloChecked = Date.now(); c.alloV = 3;
+    c.alloChecked = Date.now(); c.alloV = 4;
   } catch (e) { console.warn(`! Allociné (${c.tmdbTitle}) : ${e.message}`); }
 }
 
@@ -311,7 +311,7 @@ async function main() {
     }
   }
   const keys = new Set(films.map(keyOf));
-  const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && (!c.alloV || (c.alloV < 3 && c.allocine && !c.alloPoster)));
+  const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && (!c.alloV || (c.alloV < 4 && c.allocine && !c.alloPoster)));
   console.log(`${alloTodo.length} films à vérifier sur Allociné`);
   for (const [, c] of alloTodo) await addAllocine(c);
   console.log(`Allociné : ${alloTodo.filter(([, c]) => c.allocine).length} films reliés, ${alloTodo.filter(([, c]) => c.alloPoster).length} affiches récupérées`);
