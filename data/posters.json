@@ -6204,5 +6204,53 @@
   "alloChecked": 1794152261046,
   "alloPoster": "https://fr.web.img5.acsta.net/c_310_420/img/67/d2/67d29f7594b073cd17e01223964b67d8.jpg",
   "alloV": 4
+ },
+ "la fete du cinema 2025|": {
+  "found": false,
+  "t": 1794153350469
+ },
+ "paddington 1 2 ressortie 2024|": {
+  "found": false,
+  "t": 1794153350515
+ },
+ "soiree le festival prince|": {
+  "found": false,
+  "t": 1794153350636
+ },
+ "cannes 2025|": {
+  "found": false,
+  "t": 1794153350769
+ },
+ "queer panorama|2025": {
+  "found": false,
+  "t": 1794153351270
+ },
+ "hans zimmer concert au cinema|2018": {
+  "found": false,
+  "t": 1794153351316
+ },
+ "le printemps du cinema|": {
+  "found": false,
+  "t": 1794153351400
+ },
+ "quinzaine en salle 2026|": {
+  "found": false,
+  "t": 1794153351412
+ },
+ "coutures|2025": {
+  "found": true,
+  "t": 1794153351529,
+  "tmdb": 1390382,
+  "poster": "/zN2hnZzj3DjJH2CzB76kDo1zYFu.jpg",
+  "fr": true,
+  "tmdbTitle": "Coutures",
+  "released": "2026-02-18",
+  "pop": 5.2255,
+  "note": 6.4,
+  "votes": 87,
+  "allocine": "1000015619",
+  "alloPoster": "https://fr.web.img6.acsta.net/c_310_420/img/66/c3/66c3fe35122f2e0e86e01859a80153b7.jpg",
+  "alloChecked": 1794153355194,
+  "alloV": 4
  }
 }
