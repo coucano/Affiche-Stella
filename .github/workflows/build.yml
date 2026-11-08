@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
   pages: write
   id-token: write
 
@@ -42,17 +41,6 @@ jobs:
           git add data/posters.json data/first-seen.json
           git diff --cached --quiet || git commit -m "Mise à jour des affiches [skip ci]"
           git push || echo "Rien à pousser"
-
-      - name: Prévenir des nouveaux films (un ticket GitHub = un e-mail)
-        if: hashFiles('data/new-films.txt') != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [ -s data/new-films.txt ]; then
-            n=$(wc -l < data/new-films.txt)
-            { echo "Nouveaux films dans le tableau :"; echo; sed 's/^/- /' data/new-films.txt; echo; echo "Voir la page : https://coucano.github.io/Affiche-Stella/"; } > body.md
-            gh issue create --title "$n nouveau(x) film(s) – $(date +%d/%m)" --body-file body.md
-          fi
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
