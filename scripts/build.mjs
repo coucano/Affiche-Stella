@@ -98,6 +98,8 @@ async function tmdb(p, params = {}) {
   }
   throw new Error("TMDB : trop de requêtes");
 }
+const DEBUG = process.env.DEBUG_FILM ? normalize(process.env.DEBUG_FILM) : "";
+const dbg = (...a) => { if (DEBUG) console.log("  [debug]", ...a); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function rank(list, f) {
@@ -135,6 +137,7 @@ async function byDirector(f) {
   const first = f.director.split(/\s*(?:,|&|\bet\b|\band\b|\/)\s*/i)[0];
   const ps = await tmdb("/search/person", { query: first });
   const nf = normalize(first);
+  dbg(`réalisateur « ${first} » →`, (ps.results || []).slice(0, 3).map(x => x.name).join(", ") || "aucun");
   const person = (ps.results || []).find(x => normalize(x.name) === nf) || (ps.results || [])[0];
   if (!person) return null;
   const cr = await tmdb(`/person/${person.id}/movie_credits`, { language: "fr-FR" });
@@ -162,6 +165,7 @@ async function findMovie(f) {
       const params = { query: q, language: "fr-FR", include_adult: "false" };
       if (withYear && f.year) params.year = f.year;
       const d = await tmdb("/search/movie", params);
+      dbg(`recherche « ${q} »${params.year ? " année " + params.year : ""} →`, (d.results || []).slice(0, 6).map(m => `${m.title} / ${m.original_title} (${m.release_date})${m.poster_path ? "" : " sans affiche"}`).join(" | ") || "aucun résultat");
       rank(d.results || [], f).forEach(c => { if (!seen.has(c.m.id)) seen.set(c.m.id, c); });
     }
     const cands = [...seen.values()].sort((a, b) => b.s - a.s);
@@ -170,6 +174,7 @@ async function findMovie(f) {
       let anyKnown = false;
       for (const c of cands.slice(0, 8)) {
         const names = await directors(c.m.id);
+        dbg(`  ${c.m.title} (${c.m.release_date}) réalisé par ${names} ; tableau : ${f.director}`);
         if (names && names.length) { anyKnown = true; if (directorMatches(f.director, names)) return c.m; }
       }
       const exact = cands.find(c => c.dy === 0);
@@ -270,7 +275,16 @@ async function readJSON(file, def) { try { return JSON.parse(await readFile(file
 
 async function main() {
   if (!TMDB_KEY) throw new Error("TMDB_KEY manquant (secret GitHub).");
-  const films = toFilms(await fetchSheet());
+  let films = toFilms(await fetchSheet());
+  if (DEBUG) {
+    films = films.filter(f => normalize(f.title).includes(DEBUG));
+    for (const f of films) {
+      console.log(`Film : « ${f.title} » / réal : « ${f.director} » / année : ${f.year} / colonne réal brute : « ${f.real} »`);
+      const m = await findMovie(f);
+      console.log(" => ", m ? `${m.title} (${m.release_date}) id ${m.id}` : "rien trouvé");
+    }
+    return;
+  }
   console.log(`${films.length} films dans le tableau`);
   const cache = await readJSON(CACHE_FILE, {});
   const overrides = await readJSON(OVERRIDES_FILE, {});

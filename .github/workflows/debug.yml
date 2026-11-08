@@ -1,0 +1,22 @@
+name: Diagnostiquer un film
+
+on:
+  workflow_dispatch:
+    inputs:
+      film:
+        description: "Titre (ou partie du titre) du film tel qu'il est écrit dans le tableau"
+        required: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Recherche détaillée
+        env:
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+          DEBUG_FILM: ${{ inputs.film }}
+        run: node scripts/build.mjs
