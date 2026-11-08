@@ -209,6 +209,12 @@ async function lookup(f) {
    puis seule la fiche du film est consultée, lentement, une seule fois par film. */
 const UA = "AffichesStella/1.0 (inventaire personnel d'affiches; une requete par film)";
 let alloRobots = null;
+// règle robots.txt → expression régulière (* = n'importe quoi, $ = fin d'adresse)
+export function robotsRegex(rule) {
+  const anchored = rule.endsWith("$");
+  const body = (anchored ? rule.slice(0, -1) : rule).split("*").map(x => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*");
+  return new RegExp("^" + body + (anchored ? "$" : ""));
+}
 async function allocineAllowed(pathname) {
   if (alloRobots === null) {
     try {
@@ -218,13 +224,13 @@ async function allocineAllowed(pathname) {
       for (const line of txt.split(/\r?\n/)) {
         const [k, ...v] = line.split(":"); const key = k.trim().toLowerCase(), val = v.join(":").trim();
         if (key === "user-agent") inStar = val === "*";
-        else if (inStar && (key === "disallow" || key === "allow") && val) rules.push({ allow: key === "allow", path: val });
+        else if (inStar && (key === "disallow" || key === "allow") && val) rules.push({ allow: key === "allow", path: val, re: robotsRegex(val) });
       }
       alloRobots = rules;
     } catch { alloRobots = [{ allow: false, path: "/" }]; }
   }
-  const match = alloRobots.filter(r => pathname.startsWith(r.path.replace(/\*.*$/, "")))
-    .sort((a, b) => b.path.length - a.path.length)[0];
+  const match = alloRobots.filter(r => r.re.test(pathname)).sort((a, b) => b.path.length - a.path.length)[0];
+  if (match && !match.allow) console.warn(`  robots.txt d'Allociné interdit ${pathname} (règle ${match.path})`);
   return !match || match.allow;
 }
 async function allocineId(tmdbId) {
@@ -254,7 +260,7 @@ async function addAllocine(c) {
     const id = await allocineId(c.tmdb);
     c.allocine = id || null;
     if (id) c.alloPoster = await allocinePoster(id);
-    c.alloChecked = Date.now();
+    c.alloChecked = Date.now(); c.alloV = 2;
   } catch (e) { console.warn(`! Allociné (${c.tmdbTitle}) : ${e.message}`); }
 }
 
@@ -284,7 +290,7 @@ async function main() {
       try {
         const k = keyOf(f), old = cache[k], fresh = await lookup(f);
         // même film qu'avant : on garde l'affiche Allociné déjà trouvée (pas de nouvelle visite)
-        if (old && old.alloChecked && old.tmdb === fresh.tmdb) Object.assign(fresh, { allocine: old.allocine, alloPoster: old.alloPoster, alloChecked: old.alloChecked });
+        if (old && old.alloV === 2 && old.tmdb === fresh.tmdb) Object.assign(fresh, { allocine: old.allocine, alloPoster: old.alloPoster, alloChecked: old.alloChecked, alloV: 2 });
         cache[k] = fresh;
       }
       catch (e) { console.warn(`! ${f.title} : ${e.message}`); }
@@ -294,9 +300,10 @@ async function main() {
   await Promise.all(Array.from({ length: 4 }, worker));
   // Allociné : une seule fois par film trouvé, à la suite (pas en parallèle)
   const keys = new Set(films.map(keyOf));
-  const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && !c.alloChecked);
+  const alloTodo = Object.entries(cache).filter(([k, c]) => keys.has(k) && c.found && c.tmdb && c.alloV !== 2);
   console.log(`${alloTodo.length} films à vérifier sur Allociné`);
   for (const [, c] of alloTodo) await addAllocine(c);
+  console.log(`Allociné : ${alloTodo.filter(([, c]) => c.allocine).length} films reliés, ${alloTodo.filter(([, c]) => c.alloPoster).length} affiches récupérées`);
   await mkdir(path.dirname(CACHE_FILE), { recursive: true });
   await writeFile(CACHE_FILE, JSON.stringify(cache, null, 1) + "\n");
 
