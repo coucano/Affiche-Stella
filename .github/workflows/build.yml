@@ -1,0 +1,50 @@
+name: Générer la page des affiches
+
+on:
+  schedule:
+    - cron: "0 4 * * *"      # chaque nuit vers 5h (heure de Paris)
+  workflow_dispatch:          # bouton « Run workflow » pour lancer à la main
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Lire le tableau et chercher les affiches
+        env:
+          TMDB_KEY: ${{ secrets.TMDB_KEY }}
+        run: node scripts/build.mjs
+
+      - name: Garder les affiches trouvées (évite de tout rechercher chaque nuit)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/posters.json
+          git diff --cached --quiet || git commit -m "Mise à jour des affiches [skip ci]"
+          git push || echo "Rien à pousser"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
