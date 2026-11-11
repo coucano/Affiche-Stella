@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy_try.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -46,5 +46,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # GitHub met parfois quelques secondes à rendre l'archive visible : on réessaie une fois
+      - id: deploy_try
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - if: steps.deploy_try.outcome == 'failure'
+        run: sleep 30
       - id: deploy
+        if: steps.deploy_try.outcome == 'failure'
         uses: actions/deploy-pages@v4

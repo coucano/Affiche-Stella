@@ -273,7 +273,11 @@ async function addAllocine(c) {
     c.allocine = id || null;
     if (id) c.alloPoster = await allocinePoster(id);
     c.alloChecked = Date.now(); c.alloV = 4;
-  } catch (e) { console.warn(`! Allociné (${c.tmdbTitle}) : ${e.message}`); }
+  } catch (e) {
+    console.warn(`! Allociné (${c.tmdbTitle}) : ${e.message}`);
+    // fiche introuvable (404) : inutile de réessayer chaque nuit
+    if (/ 404$/.test(e.message)) { c.alloChecked = Date.now(); c.alloV = 4; }
+  }
 }
 
 /* ---------------- Programme principal ---------------- */
